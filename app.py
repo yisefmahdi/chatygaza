@@ -4,11 +4,9 @@ from flask import Flask, request, jsonify
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import openai
-from groq import Groq
 import google.generativeai as genai
 from flask_cors import CORS
 import tiktoken
-import base64
 from datetime import datetime
 from docx import Document
 import requests
