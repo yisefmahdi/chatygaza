@@ -76,6 +76,19 @@ def ask():
     selectedCompany = model_app.get('selectedCompany')
     chat_type = data.get('chat_type')
     chat_id = data.get('chat_id')
+    # متغيرات البحث الاكاديمي
+    field =  data.get('field')
+    pages =  data.get('pages')
+    target_audience =  data.get('target_audience')
+    methodology = data.get('methodology')
+    structure =  data.get('structure')
+    citation_style =  data.get('citation_style')
+    references_count =  data.get('references_count')
+    start_year =  data.get('start_year')
+    end_year =  data.get('end_year')
+    include_lit_review =  data.get('include_lit_review')
+    include_summary =  data.get('include_summary')
+    academic_language_level =  data.get('academic_language_level')
 
      # تحديد النسبة المئوية للتقليص (مثلاً 30%)
     reduction_percentage = 0.15
@@ -122,6 +135,11 @@ def ask():
         question_type = ""
         memory_status = ""
 
+    elif chat_type == "academic_research_writing":
+        relevant_text = ""
+        question_type = ""
+        memory_status = ""
+
     else:
 
         file_path__ = f"storage/books/{filebook}"  # المسار النسبي للملف
@@ -137,15 +155,13 @@ def ask():
 
     # استدعاء دالة generate_response مع النص المستخرج
     response = {
-        'answer': generate_response(relevant_text, question, question_type, selectedModel, selectedCompany, chat_id, chat_type, max_tokens, files=file_path ,file_type=file_type, file_name=file_name, target_language=target_language),
+        'answer': generate_response(relevant_text, question, question_type, selectedModel, selectedCompany, chat_id, chat_type, max_tokens, files=file_path ,file_type=file_type, file_name=file_name, target_language=target_language, field=field,pages=pages, methodology=methodology,target_audience=target_audience,citation_style=citation_style, structure=structure,include_summary=include_summary, academic_language_level=academic_language_level, include_lit_review=include_lit_review, start_year=start_year, references_count=references_count),
         'book_piece': relevant_text,
         'question': question,
         'memory_status': memory_status # إضافة حالة الذاكرة
     }
 
     return jsonify({"response": response})
-
-
 
 
 def fetch_and_read_file(file_path__, base_url):
@@ -192,7 +208,6 @@ def fetch_and_read_file(file_path__, base_url):
     except Exception as e:
         return {"error": f"حدث خطأ أثناء قراءة الملف: {e}"}
 
-
 @app.route('/clear_memory', methods=['POST'])
 def clear_memory():
     chat_id = request.json.get("chat_id")
@@ -237,7 +252,7 @@ def upload_file():
     return jsonify({'message': f'{file_type.capitalize()} uploaded successfully', 'file_path': file_path, 'file_name':new_filename, 'file_type': ext[1:]}), 200
 
 
-def generate_response(relevant_text, question, question_type, selectedModel, selectedCompany, chat_id, chat_type, max_tokens, files=None, file_type=None, file_name=None,target_language=None):
+def generate_response(relevant_text, question, question_type, selectedModel, selectedCompany, chat_id, chat_type, max_tokens, files=None, file_type=None, file_name=None,target_language=None, field=None, pages=None, methodology=None,target_audience=None,citation_style=None, structure=None,include_summary=None, academic_language_level=None, include_lit_review=None, start_year=None, end_year=None, references_count=None):
     # prompt = f" انت خبير اكاديمي اقرأ الكتاب التالي وأجب فقط باستخدام المعلومات من الكتاب :\n\n{relevant_text}\n\nالسؤال: {question}"
     prompt = f"""
         انت خبير أكاديمي، اقرأ الكتاب التالي وأجب فقط باستخدام المعلومات من الكتاب.\n"
@@ -258,7 +273,8 @@ def generate_response(relevant_text, question, question_type, selectedModel, sel
             prompt += "\n\n الجب على المصطلح الاتي"
         elif question_type == "scientific_problem":
             prompt += "\n\n أجب على المسألة العلمية التالية استنادًا إلى الكتاب المعطى."
-
+        elif question_type == "justify":
+            prompt += "\n\n علّل إجابتك على السؤال التالي بالاستناد إلى الكتاب المعطى."
         elif question_type == "ai":
             prompt = f"\n\n{relevant_text}\n\nالسؤال: {question}\n\nأنت خبير أكاديمي. استخدم قدراتك في الذكاء الاصطناعي للإجابة عن هذا السؤال بحرية، إذ قد لا تكون جميع المعلومات متوفرة في الكتاب."
 
@@ -272,6 +288,127 @@ def generate_response(relevant_text, question, question_type, selectedModel, sel
             {question}
              ترجم النص فقط دون شرح أو تفسير أو تكرار.
             """
+    elif chat_type == "academic_research_writing":
+
+        def fetch_references(question, references_count=None, start_year=None, end_year=None):
+            url = "https://api.semanticscholar.org/graph/v1/paper/search"
+            params = {
+                "query": question,
+                "limit": references_count + 5,  # لجلب أكثر من المطلوب قليلاً
+                "fields": "title,authors,year,venue,url"
+            }
+
+            response = requests.get(url, params=params)
+            references = []
+
+            if response.status_code == 200:
+                data = response.json().get("data", [])
+
+                # فلترة حسب السنة بداية ونهاية إذا تم تحديدهم
+                if start_year is not None and end_year is not None:
+                    data = [p for p in data if start_year <= p.get("year", 0) <= end_year]
+                elif start_year is not None:
+                    data = [p for p in data if p.get("year", 0) >= start_year]
+                elif end_year is not None:
+                    data = [p for p in data if p.get("year", 0) <= end_year]
+
+                # تقليل القائمة للعدد المطلوب
+                data = data[:references_count]
+
+                for paper in data:
+                    authors = ", ".join([a['name'] for a in paper.get("authors", [])]) if paper.get("authors") else "غير معروف"
+                    year = paper.get("year", "n.d.")
+                    title = paper.get("title", "بدون عنوان")
+                    venue = paper.get("venue", "مكان النشر غير محدد")
+                    url = paper.get("url", "")
+                    ref = f"{authors} ({year}). {title}. {venue}. Retrieved from {url}"
+                    references.append(ref)
+            else:
+                references.append("لم يتم الحصول على مراجع بسبب ضعف الانترنت  .")
+
+            return references
+
+        # جلب المراجع مع فلترة حسب السنة وعدد المراجع المطلوب
+        references_semanticscholar = fetch_references(
+            question=question,
+            references_count=references_count,
+            start_year=start_year,
+            end_year=end_year
+        )
+
+        def fetch_references_crossref(question, references_count=None, start_year=None, end_year=None):
+            url = "https://api.crossref.org/works"
+            filters = []
+            if start_year:
+                filters.append(f"from-pub-date:{start_year}")
+            if end_year:
+                filters.append(f"until-pub-date:{end_year}")
+            params = {
+                "query": question,
+                "rows": references_count + 5,
+                "filter": ",".join(filters) if filters else None,
+                "sort": "relevance"
+            }
+            response = requests.get(url, params={k: v for k, v in params.items() if v})
+            references = []
+
+            if response.status_code == 200:
+                items = response.json()["message"]["items"][:references_count]
+                for item in items:
+                    authors = ", ".join([f"{a.get('family', '')} {a.get('given', '')}".strip() for a in item.get("author", [])]) or "غير معروف"
+                    year = item.get("issued", {}).get("date-parts", [[None]])[0][0] or "n.d."
+                    title = item.get("title", ["بدون عنوان"])[0]
+                    journal = item.get("container-title", ["مكان النشر غير محدد"])[0]
+                    url = item.get("URL", "")
+                    references.append(f"{authors} ({year}). {title}. {journal}. Retrieved from {url}")
+            else:
+                references.append("⚠️")
+            return references
+
+                # جلب المراجع مع فلترة حسب السنة وعدد المراجع المطلوب
+        references_crossref = fetch_references_crossref(
+            question=question,
+            references_count=references_count,
+            start_year=start_year,
+            end_year=end_year
+        )
+
+        references = references_semanticscholar + references_crossref
+        # تنسيق المراجع للعرض ضمن البرومبت
+        formatted_references = "\n".join(f"- {ref}" for ref in references)
+
+        prompt = f"""
+            أريدك أن تكتب بحثًا أكاديميًا شاملاً ومفصلاً، وكأنك طالب جامعي مجتهد أو باحث حقيقي في الجامعة.
+
+            ستقوم بكتابة بحث أكاديمي شامل ومفصل بناءً على المعلومات التالية:
+
+            - 📚 التخصص: {field}
+            - 📝 موضوع البحث: {question}
+            - 📄 عدد الصفحات المطلوبة: {pages}
+            - 🧑‍🎓 الفئة المستهدفة: {target_audience}
+            - 🔍 المنهجية المتبعة: {methodology}
+            - 🧱 عناصر البحث الأساسية: {structure}
+            - 📌 نمط التوثيق: {citation_style}
+            - 🔢 عدد المراجع المطلوبة: {references_count}
+           - 📅 حداثة المراجع: من {start_year} إلى {end_year}
+            - 🗃️ هل تتضمن مراجعة أدبية؟ {'نعم' if include_lit_review else 'لا'}
+            - 📑 هل يتضمن ملخصًا تنفيذيًا؟ {'نعم' if include_summary else 'لا'}
+            - 🌐 لغة البحث: {academic_language_level}
+
+            اكتب البحث كاملاً ثم اختتمه بقسم بعنوان "المراجع"، يتضمن المراجع التالية بالترتيب وبنمط {citation_style}:
+            {formatted_references}
+
+            التعليمات:
+            - استخدم أسلوبًا أكاديميًا واقعيًا، يشبه ما يكتبه طالب جامعي أو باحث في السنة الأخيرة.
+            - لا تستخدم لغة مثالية أو مصقولة جدًا، بل اجعل الأسلوب طبيعيًا، دون تصنع أو تكلّف.
+            - لا تكرر التعليمات داخل النص.
+            - لا بأس ببعض التكرار الطبيعي أو التوضيح الإضافي.
+            - استخدم لغة بشرية مفهومة مع الحفاظ على الدقة العلمية.
+            - التزم بجميع العناصر المطلوبة، وأنهِ البحث بقسم المراجع وفق النمط المحدد.
+
+            ابدأ الآن في كتابة البحث بناءً على ما سبق:
+            """
+
 
     else:
         prompt = question
@@ -327,6 +464,16 @@ def generate_response(relevant_text, question, question_type, selectedModel, sel
                         max_tokens=output_tokens,
                         stream=True
                     )
+
+            elif chat_type == "academic_research_writing":
+               # استخدام واجهة API الجديدة بدون سجل المحادثة
+                stream = openai.ChatCompletion.create(
+                    model=model_key,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=8096,
+                    stream=True
+                )
+
             else:
                 # استخدام واجهة API الجديدة بدون سجل المحادثة
                 stream = openai.ChatCompletion.create(
@@ -491,6 +638,8 @@ def analyze_question(question):
         return "short_answer"
     elif re.search(r'\b(اختر|اختر الإجابة الصحيحة|اختيار من متعدد|multiple_choice)\b', question):
         return "multiple_choice"
+    elif re.search(r'\b(علل)\b', question):
+        return "justify"
     elif re.search(r'\b(حل|احسب|كيف|تفسير|فسر|scientific_problem)\b', question):
         return "scientific_problem"
     elif re.search(r'\b(حل|المصطلح الاتي|المصطلح الاتي|المصطلح|مصطلح|term)\b', question):
