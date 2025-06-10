@@ -275,6 +275,8 @@ def generate_response(relevant_text, question, question_type, selectedModel, sel
             prompt += "\n\n أجب على المسألة العلمية التالية استنادًا إلى الكتاب المعطى."
         elif question_type == "justify":
             prompt += "\n\n علّل إجابتك على السؤال التالي بالاستناد إلى الكتاب المعطى."
+        elif question_type == "ar_analysis":
+            prompt += "\n\n اعرب اذا ما كان في قواعد اعراب في الكتاب يمكنك استخدام القواعد اللغة العربية الخاصة فيك بزكاء الاصطناعي بشكل دقيق جدا ."
         elif question_type == "ai":
             prompt = f"\n\n{relevant_text}\n\nالسؤال: {question}\n\nأنت خبير أكاديمي. استخدم قدراتك في الذكاء الاصطناعي للإجابة عن هذا السؤال بحرية، إذ قد لا تكون جميع المعلومات متوفرة في الكتاب."
 
@@ -640,6 +642,8 @@ def analyze_question(question):
         return "multiple_choice"
     elif re.search(r'\b(علل)\b', question):
         return "justify"
+    elif re.search(r'\b(اعرب|إعراب|اعراب)\b', question):
+        return "ar_analysis"
     elif re.search(r'\b(حل|احسب|كيف|تفسير|فسر|scientific_problem)\b', question):
         return "scientific_problem"
     elif re.search(r'\b(حل|المصطلح الاتي|المصطلح الاتي|المصطلح|مصطلح|term)\b', question):
